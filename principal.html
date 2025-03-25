@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open House da Ca</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        h2 { color: #4B8A3B; }
+        .section { margin-bottom: 40px; }
+        .presente-item { margin: 10px 0; }
+        button { margin-top: 20px; padding: 10px; cursor: pointer; }
+        #pix-qrcode { display: none; margin-top: 10px; }
+        .gallery img { width: 200px; margin: 10px; }
+        #map { width: 100%; height: 400px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <!-- Informações sobre a Festa -->
+    <div class="section" id="party-info-section">
+        <h2>Informações sobre a Festa</h2>
+        <p><strong>Data:</strong> 30 de Março de 2025</p>
+        <p><strong>Horário:</strong> 19:00</p>
+        <p><strong>Local:</strong> Rodovia Anchieta, 764, Vila Moinho Velho, São Paulo - SP</p>
+        <p><strong>Dress Code:</strong> Casual, confortável e à vontade</p>
+        <p><strong>Tema:</strong> Chá de Casa Nova</p>
+        <p><strong>Observação:</strong> Traga seu sorriso e energia positiva!</p>
+    </div>
+
+    <!-- Seção de Confirmação de Presença -->
+    <div class="section" id="confirmation-section">
+        <h2>Confirmação de Presença</h2>
+        <form id="confirmationForm">
+            <label for="name">Seu Nome:</label><br>
+            <input type="text" id="name" name="name" required><br><br>
+            
+            <label for="attending">Você irá comparecer?</label><br>
+            <select id="attending" name="attending" required>
+                <option value="">Selecione...</option>
+                <option value="Sim">Sim</option>
+                <option value="Não">Não</option>
+            </select><br><br>
+
+            <label for="guests">Número de acompanhantes:</label><br>
+            <input type="number" id="guests" name="guests" min="0" required><br><br>
+            
+            <label for="diet">Restrições alimentares:</label><br>
+            <input type="text" id="diet" name="diet"><br><br>
+            
+            <button type="submit">Confirmar Presença</button>
+        </form>
+    </div>
+
+    <!-- Seção da Lista de Presentes -->
+    <div class="section" id="gift-list-section">
+        <h2>Lista de Presentes</h2>
+        <form id="giftForm">
+            <div id="giftList"></div>
+            <button type="submit">Confirmar Presente</button>
+        </form>
+    </div>
+
+    <!-- Seção do QR Code do Pix -->
+    <div class="section" id="pix-section">
+        <h2>Presente em Pix</h2>
+        <button onclick="getPixQRCode()">Gerar QR Code do Pix</button>
+        <br>
+        <img id="pix-qrcode" alt="QR Code Pix">
+    </div>
+
+    <!-- Seção da Galeria de Fotos -->
+    <div class="section" id="photo-gallery-section">
+        <h2>Galeria de Fotos</h2>
+        <div class="gallery">
+            <!-- Exemplo de imagens na galeria -->
+            <img src="foto1.jpg" alt="Foto 1">
+            <img src="foto2.jpg" alt="Foto 2">
+            <img src="foto3.jpg" alt="Foto 3">
+        </div>
+        <button onclick="uploadPhoto()">Adicionar Foto</button>
+    </div>
+
+    <!-- Seção do Mapa Interativo -->
+    <div class="section" id="map-section">
+        <h2>Como Chegar</h2>
+        <div id="map"></div>
+    </div>
+
+    <script>
+        // Função para carregar a lista de presentes
+        document.addEventListener("DOMContentLoaded", async function() {
+            const giftListDiv = document.getElementById("giftList");
+            
+            try {
+                let response = await fetch(`${scriptURL}?action=getGifts`);
+                let gifts = await response.json();
+                
+                gifts.forEach(gift => {
+                    if (!gift.reservado) {
+                        let div = document.createElement("div");
+                        div.classList.add("presente-item");
+                        div.innerHTML = `<input type='radio' name='presente' value='${gift.nome}'> ${gift.nome}`;
+                        giftListDiv.appendChild(div);
+                    }
+                });
+            } catch (error) {
+                console.error("Erro ao carregar presentes: ", error);
+            }
+        });
+
+        // Função para confirmar presença
+        document.getElementById("confirmationForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+            
+            let name = document.getElementById("name").value;
+            let attending = document.getElementById("attending").value;
+            let guests = document.getElementById("guests").value;
+            let diet = document.getElementById("diet").value;
+
+            let formData = new FormData();
+            formData.append("action", "reservePresence");
+            formData.append("name", name);
+            formData.append("attending", attending);
+            formData.append("guests", guests);
+            formData.append("diet", diet);
+
+            try {
+                await fetch(scriptURL, { method: "POST", body: formData });
+                alert("Presença confirmada com sucesso!");
+            } catch (error) {
+                console.error("Erro ao confirmar presença: ", error);
+                alert("Erro ao confirmar presença.");
+            }
+        });
+
+        // Função para reservar o presente
+        document.getElementById("giftForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+            
+            let selectedGift = document.querySelector("input[name='presente']:checked");
+            if (!selectedGift) {
+                alert("Selecione um presente antes de confirmar.");
+                return;
+            }
+            
+            let formData = new FormData();
+            formData.append("action", "reserveGift");
+            formData.append("presente", selectedGift.value);
+            
+            try {
+                await fetch(scriptURL, { method: "POST", body: formData });
+                alert("Presente reservado com sucesso!");
+                window.location.reload();
+            } catch (error) {
+                console.error("Erro ao reservar presente: ", error);
+                alert("Erro ao reservar presente.");
+            }
+        });
+
+        // Função para gerar o QR Code do Pix
+        async function getPixQRCode() {
+            try {
+                const response = await fetch(`${scriptURL}?action=getPixQRCode`);
+                const data = await response.json();
+                document.getElementById("pix-qrcode").src = data.qrCodeUrl;
+                document.getElementById("pix-qrcode").style.display = "block";
+            } catch (error) {
+                console.error("Erro ao buscar QR Code do Pix:", error);
+            }
+        }
+
+        // Função para adicionar foto (pode ser implementada mais tarde)
+        function uploadPhoto() {
+            alert("Esta funcionalidade ainda precisa ser implementada.");
+        }
+
+        // Mapa interativo usando o Google Maps API
+        function initMap() {
+            var location = { lat: -23.60837173461914, lng: -46.5999641418457 };  // Exemplo: São Paulo
+            var map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 14,
+                center: location
+            });
+            var marker = new google.maps.Marker({
+                position: location,
+                map: map
+            });
+        }
+    </script>
+
+    <!-- Adicionando o Google Maps API -->
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAiP1iFcKyiCH8pZS-KZ4flyy0pm05zLT4&callback=initMap"></script>
+
+</body>
+</html>
